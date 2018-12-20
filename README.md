@@ -133,9 +133,170 @@ ssize_t readline(int filedes, void *buff, size_t maxlen);
                                 返回：读或写的字节数，若出错则为-1
 ```
 具体实现见《UNP》pag：72-75
+### 二、基本TCP套接字编程
+![4-1](https://raw.githubusercontent.com/eemjwu/socket/master/%E5%9B%BE%E7%89%87/4-1.jpg)
+#### 1. socket 函数
+描述：创建新的套接字  
+原型：  
 
+```
+#include<sys/socket.h>
 
+int socket(int family, int type, int protocol);
+                                    返回：成功返回描述符，失败-1
+```
+参数值：  
+family | 说明
+--- | ---
+AF_INET | IPv4协议
+AF_INT6 | IPv6协议
+AF_LOCAL | Unix域协议
+AF_ROUTE| 路由套接字
+AF_KEY | 秘钥套接字
 
+type | 说明
+--- | ---
+SOCK_STREAM | 字节流套接字
+SOCK_DGRAM | 数据报套接字
+SOCK_SEQPACKET | 有序分组套接字
+SOCK_RAM | 原始套接字
+
+protocol | 说明
+--- | ---
+IPPROTO_TCP | TCP传输协议
+IPPROTO_UDP | UDP传输协议
+IPPROTO_SCTP | SCTP传输协议
+#### 2. connect函数
+描述：建立与服务器的连接  
+原型：   
+
+```
+#include <sys/socket.h>
+
+int connect(int sockfd, const struct sockaddr *servaddr,socklen_t addrlen);
+                                                    返回：成功 0，失败 -1
+```
+说明：  
+1. 调用connect函数触发三路握手，仅在连接建立成功或出错时才返回，出错返回有以下情况：
+   1. TCP客户端没有收到SYN分节的**响应**，返回 **ETIMEDOUT** 错误(在多次尝试失败后)；
+   2. TCP客户端收到的 SYN 响应是 RST，立即返回 **ETIMEDOUT** 错误(**硬错误**，表明服务器主机在指定的端口上没有进程等待连接)
+   3. TCP客户端发出的 SYN 在中间的路由上引发 “destination unreachable”，继续尝试重发，失败则返回相应的 ICMP 错误信息(**软错误**)
+   4. **产生 RST 错误分节的条件**：
+      1. SYN 到达目的，但指定的端口没有进程
+      2. TCP 取消一个已有连接
+      3. TCP 接收到一个不存在的连接的分节
+2. 若 connect 失败，则该套接字不能用，必须 close，再重新调用 socket 创建新的套接字。
+#### 3. bind 函数
+描述：给套接字绑定一个本地协议地址(ip port)  
+原型：
+
+```
+#include <sys/socket.h>
+
+int bind(int sockfd,const struct sockaddr *myaddr, socklen_t addrlen);
+                                                返回：成功0 失败 -1
+```
+说明：  
+给 bind 函数指定要绑定的 IP 地址和/或端口号产生的结果  
+通配地址：INADDR_ANY
+进程指定IP | 指定端口 | 结果
+--- | --- | ---
+通配地址 | 0 | 内核选择 IP 地址和端口
+通配地址 | 非0 | 内核选择 IP 地址，进程指定端口
+本地 IP 地址 | 0 | 进程指定 IP 地址，内核选择端口
+本地 IP 地址 | 非 0 | 进程指定 IP 地址和选择端口
+#### 4. listen 函数
+描述：listen 函数仅由 TCP 服务器调用  
+原型：  
+```
+#include <sys/socket.h>
+
+int listen(int sockfd, int backlog);
+            返回：成功 0 失败 -1
+```
+说明：  
+backlog：相应套接字允许排队的**最大连接个数**  
+内核为每个监听套接字维护两个队列：  
+(1) 未完成连接队列(SYN_RCVD 状态)  
+(2) 已完成连接队列(ESTABLISHED 状态)  
+![4-7](https://raw.githubusercontent.com/eemjwu/socket/master/%E5%9B%BE%E7%89%87/4-7.jpg)
+#### 5. accept 函数
+描述：服务器调用，从已完成连接队列队列头返回下一个已完成的连接  
+原型：
+
+```
+#include <sys/socket.h>
+
+int accept(int sockfd, struct sockaddr *cliaddr, socklen_t *addrlen);
+                                        返回：成功 返回描述符， 出错 -1
+```
+说明:  
+返回： **已连接套接字描述符**，形参： **监听套接字描述符**  
+cliaddr 和 addrlen 用来返回已连接的对端的协议地址。  
+成功返回一个全新的**描述符**，代表与所返回客户端的 TCP 连接。
+#### 6. fork 函数
+描述：fork 产生新进程的唯一方法；父子进程共享**fork之前打开的**描述符，描述符引用计数 +1  
+原型：
+
+```
+#include <unistd.h>
+
+pid_t fork(void);
+            返回：子进程中为 0，父进程为子进程 ID，出错 -1
+```
+#### 7. exec 函数
+描述：把当前进程替换成新的程序文件，进程 ID 不变 ；原进程打开的描述符通常跨 exec 继续打开  
+原型：
+
+```
+#include <unistd.h>
+
+int execl(const char *pathname, const char *arg0, .../* (char *) 0 */);
+
+int execv(const char *pathname, char *const *argv[]);
+
+int execle(const char *pathname, const char *arg0, .../* (cahr *) 0, char *const envp[] */);
+
+int execve(const char *pathname, char *const *argv[], char *const envp[]);
+
+int execlp(const char *fliename, const char *arg0, .../* (char *) 0 */);
+
+int execvp(const char *filename, char *const argv[]);
+                                        返回：成功不返回，出错 -1
+```
+![4-12](https://raw.githubusercontent.com/eemjwu/socket/master/%E5%9B%BE%E7%89%87/4-12.jpg)
+#### 8. close 函数
+描述：关闭套接字
+原型：  
+
+```
+#include <unistd.h>
+
+int close(int sockfd);
+            返回： 成功 0，失败 -1
+```
+说明：  
+- 调用close **套接字描述符引用计数减 1**，若减 1 后引用计数为 0 ，发送 FIN 开启 TCP 连接终止过程
+- 立即结束 TCP 连接，使用 shutdown 函数
+- 并发服务器编程时，**必须在父进程关闭已连接描述符**，否则导致套接字描述符总是大于 1， **连接不会被真正终**止，并可能**耗尽可用描述符**
+#### 9. getsockname 函数和 getpeername 函数
+描述：  
+getsockname 返回与该套接字关联的**本地协议地址**  
+getpeername 返回与该套接字关联的**外地协议地址**  
+原型：
+
+```
+#include <sys/socket.h>
+
+int getsockname(int sockfd, struct sockaddr *localaddr, socklen_t *addrlen);
+
+int getpeername(int sockfd, struct sockaddr *peeraddr, socklen_t *addrlen);
+                                                    返回：成功 0，失败 -1
+```
+说明：   
+当服务器是由通过accept的某个进程通过调用exec执行程序时，获取客户身份的唯一途径就是调用
+getpeername 
+![4-18](https://raw.githubusercontent.com/eemjwu/socket/master/%E5%9B%BE%E7%89%87/4-18.jpg)
 
 
 
