@@ -190,6 +190,8 @@ int socket(int family, int type, int protocol);
                                     返回：成功返回描述符，失败-1
 ```
 参数值：  
+
+
 family | 说明
 --- | ---
 AF_INET | IPv4协议
@@ -243,12 +245,14 @@ int bind(int sockfd,const struct sockaddr *myaddr, socklen_t addrlen);
 说明：  
 给 bind 函数指定要绑定的 IP 地址和/或端口号产生的结果  
 通配地址：INADDR_ANY
+
 进程指定IP | 指定端口 | 结果
 --- | --- | ---
 通配地址 | 0 | 内核选择 IP 地址和端口
 通配地址 | 非0 | 内核选择 IP 地址，进程指定端口
 本地 IP 地址 | 0 | 进程指定 IP 地址，内核选择端口
 本地 IP 地址 | 非 0 | 进程指定 IP 地址和选择端口
+
 ### <a name='listen'></a>4. listen 函数
 描述：listen 函数仅由 TCP 服务器调用  
 原型：  
